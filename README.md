@@ -4,6 +4,9 @@ Money Manager (android app) to Money Manager EX Converter
 This is provided as is, it was developed with LLMs ChatGPT, Deepseek and such
 Keep in mind: My CSV files follow my loacale that uses ";" as separator of columns in CSV isntead of "," (you need to change the code provided to your separator)
 
+Firts time usage, you need to setup your accounts in MMEX before doing any of this.
+#NEVER USE THIS ON YOUR MAIN DB BEFORE TESTING ON A DUMMY
+
 Workflow goes like this
 1. Get your xlsx from Money Manager app
 2. Open the file and edit you G column to have " . " as decimal separator manually (manually select range --> ctrl+f --> tab replace [Find , | replace with .])
