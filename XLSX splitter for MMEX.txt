@@ -1,0 +1,180 @@
+' Built primarily with Deepseek
+Sub FormatExcelFile()
+    Dim ws As Worksheet
+    Dim wsSource As Worksheet 'new
+    Dim wsTarget As Worksheet 'new
+    Dim savePath As String 'new02
+    Dim fileName As String 'new02
+    Dim folderPath As Variant 'new02
+    Dim rowData As String
+    Dim cell As Range
+    Dim i As Long
+    Dim stream As Object
+    Dim textLine As String
+    Set ws = ActiveSheet ' Change if needed
+    
+    
+    ' Find the last row with data in Column A and Format the date-time values in Column A
+    lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
+    For i = 2 To lastRow ' Start from row 2 to skip the header
+        If IsDate(ws.Cells(i, "A").Value) Then
+            ws.Cells(i, "A").Value = Format(ws.Cells(i, "A").Value, "YYYY-MM-DDTHH:mm:ss")
+        End If
+    Next i
+    
+    ' Delete columns I to K
+    ws.Range("I:K").Delete
+    
+    ' Insert Column between B and C
+    ws.Columns("C").Insert
+        
+    ' Move Column H to Column F
+    ws.Columns("H").Cut
+    ws.Columns("F").Insert Shift:=xlToRight
+     
+    ' Move Column ? to Column G EUR-after expenses
+    ws.Columns("H").Cut
+    ws.Columns("G").Insert Shift:=xlToRight
+    
+    ' Join text from Column H with Column I (placing result in Column J)
+    lastRow = ws.Cells(ws.Rows.Count, "H").End(xlUp).Row
+
+    
+    For i = 2 To lastRow ' Assuming row 1 contains headers
+    ws.Cells(i, "J").Value = ws.Cells(i, "H").Value & " " & ws.Cells(i, "I").Value
+    Next i
+    
+    ' Replace Column H with Column I values
+    ws.Range("H2:H" & lastRow).Value = ws.Range("J2:J" & lastRow).Value
+      
+    ' Rename headers
+    ws.Cells(1, 1).Value = "TRANSDATE"
+    ws.Cells(1, 2).Value = "ACCOUNT"
+    ws.Cells(1, 3).Value = "PAYEE"
+    ws.Cells(1, 4).Value = "CATEGORY"
+    ws.Cells(1, 5).Value = "SUBCATEGORY"
+    ws.Cells(1, 6).Value = "TRANSCODE"
+    ws.Cells(1, 7).Value = "TRANSAMOUNT"
+    ws.Cells(1, 8).Value = "NOTES"
+    
+    ' Find the last row with data in Column A
+    lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
+
+    ' Populate Column C with "Unknown" for all rows with data in Column A (starting from row 2)
+    For i = 2 To lastRow ' Start from row 2 to skip the header
+    ws.Cells(i, "C").Value = "Unknown"
+    Next i
+
+    ' Find the last row with data in Column C
+    lastRow = ws.Cells(ws.Rows.Count, "C").End(xlUp).Row
+
+    ' Replace "Transfer-Out" with "Transfer" in Column F
+    For i = 1 To lastRow ' Loop through all rows, including the header
+        If ws.Cells(i, "F").Value = "Transfer-Out" Then
+            ws.Cells(i, "F").Value = "Transfer"
+        End If
+    Next i
+    
+        ' Find the last row with data in Column F
+    lastRow = ws.Cells(ws.Rows.Count, "F").End(xlUp).Row
+
+    ' Replace "Expense"
+    For i = 1 To lastRow ' Loop through all rows, including the header
+        If ws.Cells(i, "F").Value = "Expense" Then
+            ws.Cells(i, "F").Value = "Withdrawal"
+        End If
+    Next i
+    
+        ' Replace "Income" with "Deposit" in Column F
+    For i = 1 To lastRow ' Loop through all rows, including the header
+        If ws.Cells(i, "F").Value = "Income" Then
+            ws.Cells(i, "F").Value = "Deposit"
+        End If
+    Next i
+    
+    ' Delete columns I to K
+    ws.Range("I:K").Delete
+
+    ' new Set the source worksheet
+    Set wsSource = ThisWorkbook.Sheets(1) ' Change this if your data is on a different sheet
+
+    ' new Check if the "Transfers" sheet already exists
+    On Error Resume Next
+    Set wsTarget = ThisWorkbook.Sheets("Transfers")
+    On Error GoTo 0
+
+    ' new If the "Transfers" sheet doesn't exist, create it
+    If wsTarget Is Nothing Then
+        Set wsTarget = ThisWorkbook.Sheets.Add
+        wsTarget.Name = "Transfers"
+        ' Copy headers from the source sheet to the new sheet
+        wsSource.Rows(1).Copy Destination:=wsTarget.Rows(1)
+    End If
+
+    ' new Find the last row with data in Column F on the source sheet
+    lastRow = wsSource.Cells(wsSource.Rows.Count, "F").End(xlUp).Row
+
+    ' new Initialize the target row counter (start from row 2 to skip the header)
+    targetRow = wsTarget.Cells(wsTarget.Rows.Count, "A").End(xlUp).Row + 1
+
+    ' new Loop through all rows in the source sheet
+    For i = lastRow To 2 Step -1 ' Start from the bottom to avoid skipping rows
+        If wsSource.Cells(i, "F").Value = "Transfer" Then
+            ' Copy the entire row to the "Transfers" sheet
+            wsSource.Rows(i).Copy Destination:=wsTarget.Rows(targetRow)
+            ' Delete the row from the source sheet
+            wsSource.Rows(i).Delete
+            ' Increment the target row counter
+            targetRow = targetRow + 1
+        End If
+    Next i
+    
+    MsgBox "Formatting and sheet split complete!", vbInformation
+    
+    ' new02 Prompt the user to select a folder for saving the CSV files
+    folderPath = Application.FileDialog(msoFileDialogFolderPicker).Show
+    If folderPath = False Then Exit Sub ' Exit if the user cancels the dialog
+    savePath = Application.FileDialog(msoFileDialogFolderPicker).SelectedItems(1) & "\"
+
+    ' new02 Loop through each sheet in the workbook
+    For Each ws In ThisWorkbook.Sheets
+        ' Prefill a suggested file name (using the sheet name)
+        fileName = InputBox("Enter a file name for the sheet: " & ws.Name, "Save As CSV", ws.Name)
+
+        ' If the user cancels the input box, skip this sheet
+        If fileName = "" Then
+            MsgBox "Skipping sheet: " & ws.Name
+            GoTo NextSheet
+        End If
+
+        ' Create a UTF-8 encoded CSV file
+        Set stream = CreateObject("ADODB.Stream")
+        stream.Type = 2 ' Text stream
+        stream.Charset = "UTF-8"
+        stream.Open
+
+        ' Write data to the CSV file
+        For i = 1 To ws.UsedRange.Rows.Count
+            rowData = ""
+            For Each cell In ws.UsedRange.Rows(i).Cells
+                ' Special handling for Column A (date/time values)
+                If cell.Column = 1 And IsDate(cell.Value) Then
+                    rowData = rowData & Format(cell.Value, "YYYY-MM-DDTHH:mm:ss") & ";"
+                Else
+                    rowData = rowData & cell.Value & ";"
+                End If
+            Next cell
+            rowData = Left(rowData, Len(rowData) - 1) ' Remove the trailing semicolon
+            stream.WriteText rowData, 1 ' Write the line to the stream
+        Next i
+
+        ' Save the stream to a file
+        stream.SaveToFile savePath & fileName & ".csv", 2 ' Overwrite existing file
+        stream.Close
+        Set stream = Nothing
+
+NextSheet:
+    Next ws
+    
+    MsgBox "All sheets saved as UTF-8 CSV files with semicolons in the specified folder!"
+End Sub
