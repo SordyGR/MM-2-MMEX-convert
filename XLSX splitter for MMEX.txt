@@ -1,4 +1,5 @@
 ' Built primarily with Deepseek
+' Remember to format column G numbers to use " . " as decimal separator manually (manually select range --> ctrl+f --> tab replace)
 Sub FormatExcelFile()
     Dim ws As Worksheet
     Dim wsSource As Worksheet 'new
